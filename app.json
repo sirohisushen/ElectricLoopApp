@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "ElectricConnect",
-    "slug": "electricconnect",
+    "name": "ElectricLoop",
+    "slug": "electricloop",
     "version": "1.0.0",
+    "icon": "./assets/image.png",
     "orientation": "portrait",
     "splash": {
       "resizeMode": "contain",
@@ -20,11 +21,6 @@
     "android": {
       "package": "com.example.electricconnect"
     },
-    "extra": {
-      "eas": {
-        "projectId": "replace-with-your-eas-project-id"
-      }
-    }
+    "owner": "sushensirohi"
   }
 }
-

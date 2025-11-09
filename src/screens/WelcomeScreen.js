@@ -13,7 +13,7 @@ const WelcomeScreen = ({ onContinue }) => (
           <View style={styles.logoIcon} />
           <Text style={styles.brandMark}>ElectricLoop</Text>
         </View>
-        <Text style={styles.tagline}>Electronics Marketplace</Text>
+        <Text style={styles.tagline}>Moving E-Waste At LightSpeed.</Text>
       </View>
 
       <View style={styles.heroSection}>
@@ -21,7 +21,7 @@ const WelcomeScreen = ({ onContinue }) => (
           Built For{"\n"} Those Who Move Fast
         </Text>
         <Text style={styles.heroCopy}>
-          AI-powered electronics marketplace built to help all companies find the best electronics.
+          India's Most Trusted Electronics Marketplace App
         </Text>
       </View>
 

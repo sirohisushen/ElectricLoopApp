@@ -1,62 +1,132 @@
 import { useEffect, useState } from "react";
 import {
   FlatList,
-  ScrollView,
+  Image,               // <-- NEW
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
 } from "react-native";
 
 import { supabase } from "../lib/supabase";
 import palette from "../theme/palette";
-
+import { getListings } from "../utils/storage";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import Feather from "react-native-vector-icons/Feather";
 
-// === UPDATED: Added category to sample items ===
-const sampleItems = Array.from({ length: 12 }).map((_, i) => ({
-  id: String(i + 1),
-  title: [
-    "iPhone 12",
-    "Galaxy S21",
-    "ThinkPad X1",
-    "PS4 Controller",
-    "Nikon D3500",
-    "AirPods Gen 2",
-    "MacBook Pro",
-    "Sony WH-1000XM4",
-    "Samsung SSD",
-    "Router TP-Link",
-    "USB-C Hub",
-    "Logitech Mouse",
-  ][i],
-  price: [120, 340, 560, 45, 260, 80, 890, 280, 95, 75, 35, 55][i],
-  badge: ["Good", "Like New", "Refurb", "Fair"][i % 4],
-  category: categories[i % categories.length], // <-- assign category
-}));
-
-const categories = [
-  "Audio",
-  "Image",
-  "Phones",
-  "Laptops",
-  "Parts",
-  "Consoles",
-  "Cameras",
-  "Storage",
-  "Networking",
-  "Accessories",
+/* --------------------------------------------------------------
+   Sample data – now each item has an optional `image` URL.
+   Just replace the URL with your own asset / remote image.
+   -------------------------------------------------------------- */
+const sampleItems = [
+  {
+    id: "1",
+    title: "iPhone Charger",
+    price: 3000,
+    badge: "Like New",
+    category: "Charger",
+    image:
+      "https://i.ebayimg.com/images/g/6hYAAOSw4bxjhQfi/s-l1200.png",
+  },
+  {
+    id: "2",
+    title: "Gt710 Graphics Card",
+    price: 3400,
+    badge: "Certified",
+    category: "GPUs",
+    image:
+      "https://i.ebayimg.com/images/g/vW8AAeSwVtZopSq5/s-l1200.jpg",
+  },
+  {
+    id: "3",
+    title: "XE1 Printer",
+    price: 500,
+    badge: "Refurb/Old",
+    category: "Printer",
+    image:
+      "https://u-mercari-images.mercdn.net/photos/m68110366377_1.jpg",
+  },
+  {
+    id: "4",
+    title: "Nokia 3330",
+    price: 1200,
+    badge: "Refurb",
+    category: "Phone",
+    image:
+      "https://i.redd.it/tf62glkctnb51.jpg",
+  },
+  {
+    id: "5",
+    title: "Dell Laptop Charger",
+    price: 2500,
+    badge: "Used",
+    category: "Charger",
+    image: "https://www.myorderstore.com/image/cache/catalog/Products/Products/lenovooriginalcable-550x550h.png.webp",
+  },
+  {
+    id: "6",
+    title: "HP OfficeJet 4500 Printer",
+    price: 4500,
+    badge: "Old/Refurb",
+    category: "Printer",
+    image: "https://i.ytimg.com/vi/P2SVsxK7v_Y/maxresdefault.jpg",
+  },
+  {
+    id: "7",
+    title: "Sony Walkman MP3 Player",
+    price: 1800,
+    badge: "Good",
+    category: "Audio",
+    image: "https://images-cdn.ubuy.co.in/634d115edcbffb70f4349d6b-sony-walkman-wm-ex102.jpg",
+  },
+  {
+    id: "8",
+    title: "Samsung 500GB Hard Drive",
+    price: 2200,
+    badge: "Used",
+    category: "Storage",
+    image: "https://www.lifewire.com/thmb/bl9K_09pPJBD_MFjsCZxAGTfReg=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/GettyImages-1223787492-dbb8cb439806406fb4f2d741ce643203.jpg",
+  },
+  {
+    id: "9",
+    title: "10 2gb RAM Sticks",
+    price: 300,
+    badge: "Used",
+    category: "Accessories",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT9yiku8ecyy7l25Y_Z43Q9UyWEL1R0OpUdbQ&s",
+  },
+  {
+    id: "10",
+    title: "1KG Old Electric Chips",
+    price: 1000,
+    badge: "Refurb",
+    category: "E-Chips",
+    image: "https://mtajtraders.com/wp-content/uploads/2023/01/ewaste-scaled.webp",
+  },
+  {
+    id: "11",
+    title: "15x Samsung Phones",
+    price: 1000,
+    badge: "Refurb/Old",
+    category: "Phone",
+    image: "https://i.ytimg.com/vi/DzMXJeVxkhQ/maxresdefault.jpg",
+  },
+  {
+    id: "12",
+    title: "15 720p Monitors",
+    price: 1500,
+    badge: "Certified",
+    category: "Audio",
+    image: "https://www.tvfilmprops.co.uk/userdata/PRODPIC-3899.jpg",
+  },
 ];
 
-const HomeScreen = ({ user, onSignOut }) => {
+const HomeScreen = ({ user, onItemPress }) => {
   const [email, setEmail] = useState(user?.email ?? "");
   const [profile, setProfile] = useState(null);
   const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [expandedView, setExpandedView] = useState(false); // <-- new state
+  const [savedListings, setSavedListings] = useState([]);
+
 
   useEffect(() => {
     if (!email) {
@@ -87,13 +157,30 @@ const HomeScreen = ({ user, onSignOut }) => {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, profile?.loaded]);
 
-  // === Filter items based on selected category ===
-  const filteredItems = selectedCategory
-    ? sampleItems.filter((item) => item.category === selectedCategory)
-    : sampleItems;
+  useEffect(() => {
+    const loadListings = async () => {
+      const saved = await getListings();
+      setSavedListings(saved);
+    };
+    loadListings();
+    const interval = setInterval(loadListings, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
+  /* ---------- Filtering ---------- */
+  const savedIds = new Set(savedListings.map((item) => item.id));
+  const uniqueSampleItems = sampleItems.filter((item) => !savedIds.has(item.id));
+  const allItems = [...savedListings, ...uniqueSampleItems];
+  const filteredItems = allItems.filter((item) => {
+    const matchesQuery = query
+      ? item.title.toLowerCase().includes(query.trim().toLowerCase())
+      : true;
+    return matchesQuery;
+  });
+
+  
   return (
     <View style={styles.container}>
       {/* Header Section */}
@@ -121,55 +208,18 @@ const HomeScreen = ({ user, onSignOut }) => {
         </View>
       </View>
 
-      {/* Categories - Now clearly visible */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesRow}
-      >
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            style={[
-              styles.categoryChip,
-              selectedCategory === cat && styles.categoryChipActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={() =>
-              setSelectedCategory(selectedCategory === cat ? null : cat)
-            }
-          >
-            <Text
-              style=[
-                styles.categoryText,
-                selectedCategory === cat && styles.categoryTextActive,
-              ]}
-            >
-              {cat}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Grid Header */}
+      {/* Grid Header – directly under the search bar */}
       <View style={styles.gridHeaderRow}>
         <View>
           <Text style={styles.sectionTitle}>Trending Listings</Text>
-          <Text style={styles.sectionSubtitle}>
-            {selectedCategory
-              ? `${selectedCategory} devices`
-              : "Certified refurbished devices"}
-          </Text>
+          <Text style={styles.sectionSubtitle}>Certified refurbished devices</Text>
         </View>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setExpandedView(true)} // <-- open expanded view
-        >
+        <TouchableOpacity activeOpacity={0.7}>
           <Text style={styles.seeAll}>See all →</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Product Grid - Filtered */}
+      {/* Product Grid */}
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => item.id}
@@ -177,167 +227,56 @@ const HomeScreen = ({ user, onSignOut }) => {
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.gridContent}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No listings found</Text>
+            <Text style={styles.emptySubtitle}>Try a different search term.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} activeOpacity={0.85}>
-            <View style={styles.cardImagePlaceholder}>
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.85}
+            onPress={() => onItemPress?.(item)}
+          >
+            {/* ---------- Image (with fallback) ---------- */}
+            {item.image ? (
+              <Image source={{ uri: item.image }} style={styles.cardImage} />
+            ) : (
+              <View style={styles.cardImagePlaceholder} />
+            )}
+
+            <View style={styles.cardBadgeContainer}>
               <View style={styles.cardBadge}>
                 <Text style={styles.cardBadgeText}>{item.badge}</Text>
               </View>
             </View>
+
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.title}
               </Text>
               <View style={styles.cardFooter}>
-                <Text style={styles.cardPrice}>${item.price}</Text>
+                <Text style={styles.cardPrice}>
+                  {item.price ? `₹${item.price}` : "Price on request"}
+                </Text>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.ratingStar}>★</Text>
-                  <Text style={styles.ratingText}>4.{(item.id % 9) + 1}</Text>
+                  <Text style={styles.ratingText}>
+                    {item.rating ? item.rating.toFixed(1) : `4.${(Number(item.id?.replace(/\D/g, "") || 1) % 5) + 3}`}
+                  </Text>
                 </View>
               </View>
             </View>
           </TouchableOpacity>
         )}
       />
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
-          <View style={styles.navIconActive}>
-            <Icon name="home" size={20} color={palette.accent} />
-          </View>
-          <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
-          <View style={styles.navIconContainer}>
-            <Icon name="chat-bubble-outline" size={20} color={palette.textSecondary} />
-          </View>
-          <Text style={styles.navLabel}>AI Chat</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.addButton} activeOpacity={0.85}>
-          <Feather name="plus" size={32} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
-          <View style={styles.navIconContainer}>
-            <Icon name="person-outline" size={20} color={palette.textSecondary} />
-          </View>
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={onSignOut}>
-          <View style={styles.navIconContainer}>
-            <Icon name="logout" size={20} color={palette.textSecondary} />
-          </View>
-          <Text style={styles.navLabel}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* === EXPANDED VIEW MODAL === */}
-      <Modal visible={expandedView} animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {selectedCategory ? `${selectedCategory} Listings` : "All Listings"}
-            </Text>
-            <TouchableOpacity onPress={() => setExpandedView(false)}>
-              <Icon name="close" size={28} color={palette.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={filteredItems}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            columnWrapperStyle={styles.gridRow}
-            contentContainerStyle={styles.modalGridContent}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.card} activeOpacity={0.85}>
-                <View style={styles.cardImagePlaceholder}>
-                  <View style={styles.cardBadge}>
-                    <Text style={styles.cardBadgeText}>{item.badge}</Text>
-                  </View>
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.cardPrice}>${item.price}</Text>
-                    <View style={styles.ratingContainer}>
-                      <Text style={styles.ratingStar}>★</Text>
-                      <Text style={styles.ratingText}>4.{(item.id % 9) + 1}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </Modal>
     </View>
   );
 };
 
-/* === UPDATED STYLES === */
+/* ====================== STYLES ====================== */
 const styles = StyleSheet.create({
-  // ... (all previous styles remain unchanged)
-
-  // === CATEGORY CHIPS - Now more visible ===
-  categoryChip: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.1)",
-    minWidth: 90,
-    alignItems: "center",
-  },
-  categoryChipActive: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
-  },
-  categoryText: {
-    color: palette.textPrimary,
-    fontWeight: "700",
-    fontSize: 15,
-    letterSpacing: -0.3,
-  },
-  categoryTextActive: {
-    color: "#FFFFFF",
-  },
-
-  // === MODAL STYLES ===
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.06)",
-    backgroundColor: "#FFFFFF",
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.textPrimary,
-  },
-  modalGridContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 100,
-  },
-
-  // ... rest of your original styles below
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
@@ -402,11 +341,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: palette.textPrimary,
   },
-  categoriesRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
+
+  /* ---- Grid Header (no categories) ---- */
   gridHeaderRow: {
     paddingHorizontal: 20,
     marginTop: 8,
@@ -432,6 +368,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 15,
   },
+
+  /* ---- Grid ---- */
   gridContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
@@ -452,13 +390,26 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.04)",
+    position: "relative",
+  },
+
+  /* Image */
+  cardImage: {
+    width: "100%",
+    height: 140,
+    resizeMode: "cover",
   },
   cardImagePlaceholder: {
+    width: "100%",
     height: 140,
     backgroundColor: "#F3F4F6",
-    alignItems: "flex-start",
-    justifyContent: "flex-start",
-    padding: 10,
+  },
+
+  /* Badge (now positioned absolutely over the image) */
+  cardBadgeContainer: {
+    position: "absolute",
+    top: 10,
+    left: 10,
   },
   cardBadge: {
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -472,6 +423,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
+
   cardContent: {
     padding: 12,
   },
@@ -507,66 +459,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: palette.textSecondary,
   },
-  bottomNav: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.06)",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    paddingBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  navItem: {
+
+  /* Empty state */
+  emptyState: {
+    paddingVertical: 40,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    width: "100%",
   },
-  navIconContainer: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navIconActive: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: `${palette.accent}15`,
-    borderRadius: 12,
-  },
-  navLabel: {
-    fontSize: 11,
-    color: palette.textSecondary,
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: "600",
+    color: palette.textPrimary,
+    marginBottom: 6,
   },
-  navLabelActive: {
-    color: palette.accent,
-  },
-  addButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: palette.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: palette.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
-    marginTop: -30,
+  emptySubtitle: {
+    fontSize: 14,
+    color: palette.textSecondary,
   },
 });
 
